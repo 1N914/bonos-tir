@@ -3,18 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor de TIR - Bonos Argentinos</title>
+    <title>Monitor de TIR en Tiempo Real - nacarado.com</title>
+    <!-- SheetJS para procesar de forma segura la lista de tickers del Excel -->
+    <script src="https://jsdelivr.net"></script>
     <style>
         :root {
-            --primary: #003366;
-            --secondary: #17a2b8;
-            --dark: #212529;
-            --light: #f8f9fa;
-            --border: #dee2e6;
+            --primary: #0A2540;
+            --secondary: #635BFF;
+            --dark: #1A1F36;
+            --light: #F7FAFC;
+            --border: #E3E8EE;
+            --success: #00D4B2;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f4f6f9;
+            background-color: #0A2540;
+            background-image: radial-gradient(circle at 10% 20%, rgba(99, 91, 255, 0.15) 0%, transparent 40%);
             color: var(--dark);
             margin: 0;
             padding: 20px;
@@ -25,57 +29,76 @@
         }
         .container {
             background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            max-width: 500px;
+            padding: 35px;
+            border-radius: 16px;
+            box-shadow: 0 50px 100px -20px rgba(50,50,93,0.25), 0 30px 60px -30px rgba(0,0,0,0.3);
+            max-width: 520px;
             width: 100%;
         }
         h1 {
             color: var(--primary);
-            font-size: 24px;
+            font-size: 22px;
             margin-top: 0;
-            border-bottom: 2px solid var(--secondary);
-            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
             text-align: center;
         }
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
         label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             font-weight: 600;
+            font-size: 13px;
+            color: #4F5B66;
         }
-        input[type="text"] {
+        select, input[type="file"] {
             width: 100%;
             padding: 12px;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             box-sizing: border-box;
-            font-size: 16px;
-            text-transform: uppercase;
+            font-size: 15px;
+            background: var(--light);
+        }
+        select {
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--primary);
         }
         button {
             width: 100%;
-            background-color: var(--primary);
+            background-color: var(--secondary);
             color: white;
             border: none;
-            padding: 12px;
-            border-radius: 6px;
-            font-size: 16px;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 15px;
             font-weight: bold;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(50,50,93,0.11);
         }
         button:hover {
-            background-color: #002244;
+            background-color: #534bc7;
+            transform: translateY(-1px);
         }
+        .status-badge {
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 6px;
+        }
+        .status-none { background: #FDF2E9; color: #7E4B12; border: 1px solid #FADBD8; }
+        .status-loaded { background: #E6F4EA; color: #137333; border: 1px solid #CEEAD6; }
         .result-box {
             display: none;
             margin-top: 25px;
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 10px;
             background-color: var(--light);
             padding: 20px;
         }
@@ -83,49 +106,56 @@
             display: flex;
             justify-content: space-between;
             padding: 10px 0;
-            border-bottom: 1px solid #e9ecef;
+            border-bottom: 1px solid #EDF2F7;
+            font-size: 14px;
         }
         .result-item:last-child {
             border-bottom: none;
         }
-        .label {
-            font-weight: 500;
-            color: #6c757d;
-        }
-        .value {
-            font-weight: bold;
-            color: var(--dark);
-        }
-        .tir-value {
-            color: #28a745;
-            font-size: 18px;
-        }
+        .label { font-weight: 500; color: #697386; }
+        .value { font-weight: bold; color: var(--primary); }
+        .tir-value { color: #137333; font-size: 18px; }
         .error {
-            color: #dc3545;
+            color: #C53030;
+            background: #FFF5F5;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #FEB2B2;
             text-align: center;
             margin-top: 15px;
             display: none;
-            font-weight: 500;
+            font-size: 13px;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Consulta de TIR de Bonos</h1>
+    <h1>Análisis de Renta Fija - BYMA</h1>
     
+    <!-- Lector del Excel Local (Solo Lectura de Tickers) -->
     <div class="form-group">
-        <label for="ticker">Ticker del Bono Argentino</label>
-        <input type="text" id="ticker" placeholder="Ej. TZX28, AL30, GD30" autocomplete="off">
+        <label for="excelFile">1. Cargar "ByMA ARS" (.xlsx) para extraer Tickers</label>
+        <input type="file" id="excelFile" accept=".xlsx, .xls" onchange="importarTickers(event)">
+        <div id="fileStatus" class="status-badge status-none">Esperando archivo...</div>
+    </div>
+
+    <!-- Selector Dinámico alimentado por el Excel -->
+    <div class="form-group">
+        <label for="tickerSelector">2. Seleccionar Ticker Disponible</label>
+        <select id="tickerSelector" disabled>
+            <option value="">-- Cargue un archivo primero --</option>
+        </select>
     </div>
     
-    <button onclick="consultarBono()">Obtener Métricas</button>
+    <button onclick="fetchExternalTIR()">Consultar TIR en Tiempo Real</button>
     
-    <div class="error" id="errorMessage">Ticker no encontrado en la base de datos de mercado.</div>
+    <div class="error" id="errorMessage"></div>
 
+    <!-- Resultados con Marcas de Tiempo -->
     <div class="result-box" id="resultBox">
         <div class="result-item">
-            <span class="label">Bono (Ticker):</span>
+            <span class="label">Bono Seleccionado:</span>
             <span class="value" id="resTicker">--</span>
         </div>
         <div class="result-item">
@@ -133,29 +163,22 @@
             <span class="value tir-value" id="resTir">--</span>
         </div>
         <div class="result-item">
-            <span class="label">Timestamp Actual:</span>
+            <span class="label">Timestamp de Consulta:</span>
             <span class="value" id="resCurrentTime">--</span>
         </div>
         <div class="result-item">
-            <span class="label">Timestamp del Valor TIR:</span>
+            <span class="label">Timestamp del Valor (Mercado):</span>
             <span class="value" id="resTirTime">--</span>
         </div>
         <div class="result-item">
-            <span class="label">Fuente de Datos:</span>
+            <span class="label">Origen / Fuente Certificada:</span>
             <span class="value" id="resSource">--</span>
         </div>
     </div>
 </div>
 
 <script>
-    // Base de datos simulada con información real del mercado e índices de origen
-    const mockBondMarket = {
-        "TZX28": { tir: "7.24%", source: "Portfolio Personal Inversiones (PPI) - Datos Técnicos", delayMinutes: 1 },
-        "AL30": { tir: "21.40%", source: "Bolsas y Mercados Argentinos (BYMA Data) via EcoValores", delayMinutes: 0 },
-        "GD30": { tir: "18.15%", source: "Bolsas y Mercados Argentinos (BYMA Data) via EcoValores", delayMinutes: 0 },
-        "AL35": { tir: "16.80%", source: "IAMC (Instituto Argentino de Mercado de Capitales)", delayMinutes: 5 },
-        "DICP": { tir: "9.50%", source: "Portfolio Personal Inversiones (PPI)", delayMinutes: 3 }
-    };
+    let tickerList = [];
 
     function formatTimestamp(date) {
         return date.getFullYear() + '-' + 
@@ -166,39 +189,82 @@
             String(date.getSeconds()).padStart(2, '0');
     }
 
-    function consultarBono() {
-        const tickerInput = document.getElementById("ticker").value.trim().toUpperCase();
+    // Lector Puro del archivo Excel local
+    function importarTickers(event) {
+        const file = event.target.files[0];
+        const statusDiv = document.getElementById("fileStatus");
+        const selector = document.getElementById("tickerSelector");
+        const errorDiv = document.getElementById("errorMessage");
+        
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                const targetSheet = "ByMA ARS";
+                if (!workbook.SheetNames.includes(targetSheet)) {
+                    throw new Error(`Falta la pestaña "${targetSheet}" en el libro.`);
+                }
+
+                const worksheet = workbook.Sheets[targetSheet];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                tickerList = [];
+                jsonData.forEach(row => {
+                    // Extrae dinámicamente cualquier celda que sirva de Identificador/Ticker
+                    const key = Object.keys(row).find(k => /ticker|simbolo|especie|bono/i.test(k));
+                    if (key && row[key]) {
+                        const cleanTicker = String(row[key]).trim().toUpperCase();
+                        if (!tickerList.includes(cleanTicker)) tickerList.push(cleanTicker);
+                    }
+                });
+
+                if (tickerList.length === 0) throw new Error("No se encontraron símbolos legibles.");
+
+                // Actualizar e Interconectar el Selector HTML
+                selector.innerHTML = '<option value="">-- Seleccione un Ticker --</option>';
+                tickerList.sort().forEach(t => {
+                    selector.innerHTML += `<option value="${t}">${t}</option>`;
+                });
+                
+                selector.disabled = false;
+                statusDiv.innerText = `${tickerList.length} Tickers listados de "ByMA ARS"`;
+                statusDiv.className = "status-badge status-loaded";
+                errorDiv.style.display = "none";
+
+            } catch (err) {
+                statusDiv.innerText = "Error de estructura";
+                statusDiv.className = "status-badge status-none";
+                errorDiv.innerText = err.message;
+                errorDiv.style.display = "block";
+                selector.disabled = true;
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // Consultor de API Externa Asíncrona (Conexión cruzada a datos de BYMA)
+    async function fetchExternalTIR() {
+        const selectedTicker = document.getElementById("tickerSelector").value;
         const errorDiv = document.getElementById("errorMessage");
         const resultBox = document.getElementById("resultBox");
+        const now = new Date();
 
-        // Ocultar estados anteriores
         errorDiv.style.display = "none";
         resultBox.style.display = "none";
 
-        if (!tickerInput) return;
-
-        if (mockBondMarket[tickerInput]) {
-            const bondData = mockBondMarket[tickerInput];
-            
-            // Generación de marcas de tiempo estructuradas
-            const now = new Date();
-            const tirTime = new Date(now.getTime() - (bondData.delayMinutes * 60 * 1000));
-
-            // Inyección de variables en el DOM HTML
-            document.getElementById("resTicker").innerText = tickerInput;
-            document.getElementById("resTir").innerText = bondData.tir;
-            document.getElementById("resCurrentTime").innerText = formatTimestamp(now);
-            document.getElementById("resTirTime").innerText = formatTimestamp(tirTime);
-            document.getElementById("resSource").innerText = bondData.source;
-
-            // Mostrar el contenedor de resultados
-            resultBox.style.display = "block";
-        } else {
-            // Mostrar error de Ticker no encontrado
+        if (!selectedTicker) {
+            errorDiv.innerText = "Por favor, seleccione un activo de la lista.";
             errorDiv.style.display = "block";
+            return;
         }
-    }
-</script>
 
-</body>
-</html>
+        try {
+            // Consulta directa a la API de datos abiertos de BYMA Data
+            const response = await fetch('https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/public-bonds');
+            
+            if (!response.ok) throw new Error("No se pudo conectar con el servidor de BYMA Data.");
+            
